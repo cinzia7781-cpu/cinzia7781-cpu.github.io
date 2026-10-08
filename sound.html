@@ -1,0 +1,1173 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Soundpad Pro - Polyphonic Web Station with Gamepad Background Support</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            cyber: {
+              bg: '#0a0d14',
+              card: '#111528',
+              cardBorder: '#1e2642',
+              accent: '#00f3ff',
+              pink: '#ff0055',
+              green: '#00ff66',
+              yellow: '#ffcc00',
+              dark: '#080a10',
+              muted: '#64748b'
+            }
+          },
+          fontFamily: {
+            orbitron: ['Orbitron', 'sans-serif'],
+            prompt: ['Prompt', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background-color: #080a10;
+      color: #f1f5f9;
+      font-family: 'Prompt', sans-serif;
+      background-image: 
+        radial-gradient(circle at 10% 10%, rgba(0, 243, 255, 0.07) 0%, transparent 40%),
+        radial-gradient(circle at 90% 90%, rgba(255, 0, 85, 0.07) 0%, transparent 40%);
+      background-attachment: fixed;
+    }
+
+    .glow-cyan { box-shadow: 0 0 15px rgba(0, 243, 255, 0.25); }
+    .glow-pink { box-shadow: 0 0 15px rgba(255, 0, 85, 0.3); }
+    .glow-green { box-shadow: 0 0 15px rgba(0, 255, 102, 0.3); }
+    .text-glow-cyan { text-shadow: 0 0 8px rgba(0, 243, 255, 0.7); }
+    .text-glow-pink { text-shadow: 0 0 8px rgba(255, 0, 85, 0.7); }
+    .text-glow-green { text-shadow: 0 0 8px rgba(0, 255, 102, 0.7); }
+
+    /* Keyframe animations for active pads */
+    @keyframes padFlash {
+      0% { box-shadow: 0 0 20px rgba(0, 243, 255, 0.9), inset 0 0 15px rgba(0, 243, 255, 0.6); border-color: #00f3ff; }
+      50% { box-shadow: 0 0 30px rgba(255, 0, 85, 0.9), inset 0 0 20px rgba(255, 0, 85, 0.6); border-color: #ff0055; }
+      100% { box-shadow: 0 0 15px rgba(0, 243, 255, 0.4), inset 0 0 10px rgba(0, 243, 255, 0.2); border-color: #00f3ff; }
+    }
+
+    .pad-active-flash {
+      animation: padFlash 0.3s ease-out;
+      border-color: #00f3ff !important;
+    }
+
+    /* Custom range sliders */
+    input[type=range] {
+      -webkit-appearance: none;
+      background: #1e2642;
+      border-radius: 4px;
+      height: 6px;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      height: 16px;
+      width: 16px;
+      border-radius: 50%;
+      background: #00f3ff;
+      cursor: pointer;
+      box-shadow: 0 0 10px rgba(0, 243, 255, 0.8);
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #080a10; }
+    ::-webkit-scrollbar-thumb { background: #1e2642; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #00f3ff; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between p-3 md:p-6 select-none">
+
+  <header class="max-w-7xl mx-auto w-full mb-6">
+    <div class="bg-cyber-card/90 backdrop-blur-lg p-4 md:p-6 rounded-2xl border border-cyber-cardBorder glow-cyan flex flex-col lg:flex-row justify-between items-center gap-4">
+      
+      <!-- LOGO & STATS -->
+      <div class="flex items-center gap-4">
+        <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-cyber-accent to-cyber-pink flex items-center justify-center text-cyber-dark text-2xl font-black shadow-lg shadow-cyber-accent/30">
+          <i class="fa-solid fa-gamepad animate-pulse"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <h1 class="text-2xl md:text-3xl font-black font-orbitron tracking-wider text-white">
+              SOUNDPAD <span class="text-cyber-accent text-glow-cyan">PRO</span>
+            </h1>
+            <span class="text-[10px] font-orbitron bg-cyber-pink/20 text-cyber-pink border border-cyber-pink/40 px-2 py-0.5 rounded-full font-bold">
+              GAMEPAD ACTIVE v3.0
+            </span>
+          </div>
+          <p class="text-xs text-cyber-muted mt-0.5">ระบบเล่นเสียง Polyphonic + รองรับจอยกดข้ามหน้าต่าง / Taskbar</p>
+        </div>
+      </div>
+
+      <!-- GAMEPAD STATUS INDICATOR & PLAYBACK ACTIONS -->
+      <div class="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-end">
+        
+        <!-- GAMEPAD CONNECTION STATUS BADGE -->
+        <div id="gamepadStatusBadge" class="bg-cyber-dark px-3 py-1.5 rounded-xl border border-cyber-cardBorder flex items-center gap-2 text-xs transition-all">
+          <span id="gamepadStatusDot" class="w-2.5 h-2.5 rounded-full bg-gray-500"></span>
+          <i class="fa-solid fa-gamepad text-gray-400" id="gamepadStatusIcon"></i>
+          <span id="gamepadStatusText" class="font-bold text-gray-400 font-orbitron">No Gamepad</span>
+        </div>
+
+        <!-- POLYPHONIC / MONOPHONIC MODE SWITCH -->
+        <div class="bg-cyber-dark p-1.5 rounded-xl border border-cyber-cardBorder flex items-center gap-1">
+          <button id="modePolyBtn" class="px-3 py-1.5 rounded-lg text-xs font-bold font-orbitron transition-all bg-cyber-accent text-cyber-dark shadow-md" title="กดรัวๆ เสียงซ้อนทับกันได้">
+            <i class="fa-solid fa-layer-group mr-1"></i> POLY (กดรัวซ้อน)
+          </button>
+          <button id="modeMonoBtn" class="px-3 py-1.5 rounded-lg text-xs font-bold font-orbitron text-gray-400 hover:text-white transition-all" title="กดแล้วตัดเสียงเก่า เริ่มใหม่ทันที">
+            <i class="fa-solid fa-arrows-rotate mr-1"></i> MONO (ตัดแล้วเริ่มใหม่)
+          </button>
+        </div>
+
+        <!-- GLOBAL HOTKEY & ROUTING ASSISTANT MODAL BUTTON -->
+        <button id="openGuideBtn" class="bg-cyber-cardBorder hover:bg-cyber-accent/20 border border-cyber-accent/50 text-cyber-accent font-semibold px-3.5 py-2 rounded-xl text-xs transition-all flex items-center gap-2">
+          <i class="fa-solid fa-headset text-sm"></i>
+          <span>ต่อเสียง / เล่นตอนย่อจอ</span>
+        </button>
+
+        <!-- ADD AUDIO FILE -->
+        <label class="cursor-pointer bg-gradient-to-r from-cyber-accent to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-cyber-dark font-bold px-4 py-2 rounded-xl transition-all duration-200 flex items-center gap-2 text-xs shadow-lg shadow-cyber-accent/20">
+          <i class="fa-solid fa-plus text-sm"></i>
+          <span>เพิ่มไฟล์เสียง</span>
+          <input type="file" id="audioFileInput" accept="audio/*" multiple class="hidden">
+        </label>
+
+        <!-- STOP ALL SOUNDS -->
+        <button id="stopAllBtn" class="bg-cyber-pink/20 hover:bg-cyber-pink hover:text-white border border-cyber-pink/50 text-cyber-pink font-bold px-3.5 py-2 rounded-xl text-xs transition-all flex items-center gap-2">
+          <i class="fa-solid fa-hand-paper"></i>
+          <span>หยุดทั้งหมด</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="max-w-7xl mx-auto w-full mb-4">
+    <div class="bg-gradient-to-r from-cyber-card via-cyber-dark to-cyber-card border border-cyber-accent/30 rounded-xl p-3 flex flex-col md:flex-row items-center justify-between gap-2 text-xs">
+      <div class="flex items-center gap-2.5 text-cyber-accent">
+        <i class="fa-solid fa-lightbulb text-cyber-yellow text-base animate-pulse"></i>
+        <span><strong class="text-white">เคล็ดลับกดเสียงตอนย่อหน้าต่าง (Taskbar / Fullscreen Game):</strong> ตั้งค่าใช้ปุ่มบน <strong>Gamepad (Xbox / PlayStation)</strong> บราวเซอร์จะอนุญาตให้อ่านสัญญาณจอยได้แม้ย่อหน้าต่างลง Taskbar ทำให้กดซาวด์เอฟเฟกต์ได้ขณะเล่นเกม!</span>
+      </div>
+      <button onclick="document.getElementById('openGuideBtn').click()" class="text-cyber-green underline hover:text-white whitespace-nowrap text-[11px] font-bold">
+        ดูวิธีตั้งค่าอย่างละเอียด &rarr;
+      </button>
+    </div>
+  </div>
+
+  <main class="max-w-7xl mx-auto w-full flex-grow mb-6">
+    
+    <!-- EMPTY STATE -->
+    <div id="emptyState" class="flex flex-col items-center justify-center py-20 px-4 bg-cyber-card/40 border border-dashed border-cyber-cardBorder rounded-2xl text-center">
+      <div class="w-20 h-20 rounded-2xl bg-cyber-accent/10 border border-cyber-accent/30 flex items-center justify-center text-cyber-accent text-3xl mb-4 text-glow-cyan animate-bounce">
+        <i class="fa-solid fa-music"></i>
+      </div>
+      <h2 class="text-xl font-bold text-white mb-2 font-orbitron">ยังไม่มีไฟล์เสียงในคลัง</h2>
+      <p class="text-cyber-muted text-xs max-w-md mb-6">คลิกปุ่มด้านล่างเพื่อเลือกไฟล์ MP3, WAV, OGG หรือ FLAC เข้ามาสร้าง Soundboard ส่วนตัว</p>
+      <label class="cursor-pointer bg-cyber-card border border-cyber-accent/50 hover:border-cyber-accent text-cyber-accent font-semibold px-6 py-3 rounded-xl transition-all text-sm flex items-center gap-2">
+        <i class="fa-solid fa-folder-open"></i>
+        <span>เลือกไฟล์เสียงจากเครื่อง</span>
+        <input type="file" id="audioFileInputEmpty" accept="audio/*" multiple class="hidden">
+      </label>
+    </div>
+
+    <!-- PADS GRID CONTAINER -->
+    <div id="soundpadGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 hidden">
+      <!-- Dynamic Soundpad Cards Generated via JS -->
+    </div>
+  </main>
+
+  <div id="trimmerModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-300">
+    <div class="bg-cyber-card border border-cyber-accent/40 rounded-2xl p-5 md:p-6 max-w-2xl w-full shadow-2xl glow-cyan text-white relative flex flex-col gap-4 transform scale-95 transition-transform duration-300" id="trimmerModalContent">
+      
+      <!-- Modal Header -->
+      <div class="flex justify-between items-center border-b border-cyber-cardBorder pb-3">
+        <div class="flex items-center gap-3">
+          <i class="fa-solid fa-scissors text-cyber-accent text-lg text-glow-cyan"></i>
+          <h3 class="text-base font-bold font-orbitron text-white">ตัดต่อ & ปรับแต่งเสียง (Audio Editor)</h3>
+        </div>
+        <button id="closeTrimmerBtn" class="text-gray-400 hover:text-white text-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- File Info -->
+      <div class="flex items-center justify-between text-xs bg-cyber-dark p-3 rounded-xl border border-cyber-cardBorder">
+        <span id="trimmerFileName" class="font-semibold text-cyber-accent truncate max-w-xs">filename.mp3</span>
+        <span id="trimmerDuration" class="text-gray-400 font-mono">00:00.0 / 00:00.0</span>
+      </div>
+
+      <!-- Waveform Canvas Visualizer -->
+      <div class="relative w-full h-28 bg-black/70 rounded-xl overflow-hidden border border-cyber-cardBorder flex items-center justify-center">
+        <canvas id="waveformCanvas" class="w-full h-full"></canvas>
+        <div id="trimOverlayLeft" class="absolute left-0 top-0 bottom-0 bg-black/80 border-r-2 border-cyber-pink pointer-events-none"></div>
+        <div id="trimOverlayRight" class="absolute right-0 top-0 bottom-0 bg-black/80 border-l-2 border-cyber-pink pointer-events-none"></div>
+      </div>
+
+      <!-- Trimmer Time Controls -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-cyber-dark p-4 rounded-xl border border-cyber-cardBorder">
+        <div>
+          <div class="flex justify-between text-xs font-semibold mb-1">
+            <span class="text-cyber-accent"><i class="fa-solid fa-play"></i> เริ่มต้น (Start)</span>
+            <span id="startTimeLabel" class="font-mono text-cyber-accent">0.00s</span>
+          </div>
+          <input type="range" id="startRange" min="0" max="100" step="0.01" value="0" class="w-full">
+        </div>
+
+        <div>
+          <div class="flex justify-between text-xs font-semibold mb-1">
+            <span class="text-cyber-pink"><i class="fa-solid fa-stop"></i> สิ้นสุด (End)</span>
+            <span id="endTimeLabel" class="font-mono text-cyber-pink">0.00s</span>
+          </div>
+          <input type="range" id="endRange" min="0" max="100" step="0.01" value="100" class="w-full">
+        </div>
+
+        <!-- Fade In/Out & Boost Settings -->
+        <div class="flex items-center justify-between gap-2 text-xs">
+          <span class="text-gray-300">Fade In (วินาที):</span>
+          <input type="number" id="fadeInInput" min="0" max="5" step="0.1" value="0" class="bg-cyber-card border border-cyber-cardBorder rounded px-2 py-1 w-20 text-center font-mono text-cyber-accent">
+        </div>
+
+        <div class="flex items-center justify-between gap-2 text-xs">
+          <span class="text-gray-300">Fade Out (วินาที):</span>
+          <input type="number" id="fadeOutInput" min="0" max="5" step="0.1" value="0" class="bg-cyber-card border border-cyber-cardBorder rounded px-2 py-1 w-20 text-center font-mono text-cyber-pink">
+        </div>
+      </div>
+
+      <!-- Volume Boost Toggle -->
+      <div class="flex items-center justify-between bg-cyber-dark px-4 py-2.5 rounded-xl border border-cyber-cardBorder text-xs">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-drum-steelpan text-cyber-yellow"></i>
+          <span>Volume Boost (+200% เพิ่มความดังพิเศษ):</span>
+        </div>
+        <input type="checkbox" id="volumeBoostCheckbox" class="w-4 h-4 accent-cyber-accent cursor-pointer">
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex items-center justify-between gap-3 pt-2">
+        <button id="previewTrimBtn" class="bg-cyber-cardBorder hover:bg-gray-700 text-cyber-accent font-semibold px-4 py-2 rounded-xl text-xs transition-all flex items-center gap-2">
+          <i class="fa-solid fa-play"></i>
+          <span>ทดลองฟังช่วงตัด</span>
+        </button>
+
+        <div class="flex items-center gap-2">
+          <button id="cancelTrimBtn" class="bg-gray-800 hover:bg-gray-700 text-gray-300 font-semibold px-4 py-2 rounded-xl text-xs transition-all">
+            ยกเลิก
+          </button>
+          <button id="saveTrimBtn" class="bg-cyber-accent hover:bg-cyan-300 text-cyber-dark font-bold px-5 py-2 rounded-xl text-xs transition-all shadow-lg shadow-cyber-accent/20">
+            บันทึกการปรับแต่ง
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="keybindModal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-300">
+    <div class="bg-cyber-card border border-cyber-accent/50 rounded-2xl p-6 max-w-md w-full shadow-2xl glow-cyan text-center flex flex-col items-center gap-5">
+      <div class="w-16 h-16 rounded-2xl bg-cyber-accent/10 border border-cyber-accent/40 flex items-center justify-center text-cyber-accent text-3xl animate-bounce">
+        <i class="fa-solid fa-gamepad" id="keybindModalIcon"></i>
+      </div>
+      <div>
+        <h3 class="text-base font-bold text-white font-orbitron mb-1">ตั้งค่าปุ่ม Hotkey (Keyboard / Gamepad)</h3>
+        <p class="text-xs text-cyber-muted">กดปุ่มบน <span class="text-cyber-accent font-semibold">คีย์บอร์ด</span> หรือ <span class="text-cyber-green font-semibold">ปุ่มบนจอย Gamepad</span> ที่ต้องการกำหนดให้ซาวด์นี้</p>
+      </div>
+
+      <div class="w-full bg-cyber-dark border-2 border-dashed border-cyber-accent/60 rounded-xl py-6 px-4 relative">
+        <span id="keybindListeningText" class="text-lg font-black text-cyber-accent font-orbitron tracking-widest text-glow-cyan block">
+          กำลังรอการกดปุ่ม...
+        </span>
+        <div class="text-[10px] text-gray-400 mt-2 flex items-center justify-center gap-2">
+          <span class="bg-cyber-card border border-cyber-cardBorder px-2 py-0.5 rounded text-gray-300"><i class="fa-solid fa-keyboard mr-1"></i>กดคีย์บอร์ด</span>
+          <span>หรือ</span>
+          <span class="bg-cyber-card border border-cyber-green/40 text-cyber-green px-2 py-0.5 rounded"><i class="fa-solid fa-gamepad mr-1"></i>กดปุ่มจอย</span>
+        </div>
+      </div>
+
+      <div class="flex gap-3 w-full text-xs">
+        <button id="removeKeybindBtn" class="flex-1 bg-red-900/40 hover:bg-red-800 text-red-300 border border-red-700 font-semibold py-2.5 rounded-xl transition-all">
+          ยกเลิก Hotkey
+        </button>
+        <button id="cancelKeybindBtn" class="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 font-semibold py-2.5 rounded-xl transition-all">
+          ยกเลิก
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="guideModal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-300">
+    <div class="bg-cyber-card border border-cyber-accent/50 rounded-2xl p-5 md:p-6 max-w-3xl w-full shadow-2xl glow-cyan text-white relative flex flex-col gap-4 max-h-[90vh] overflow-hidden">
+      
+      <div class="flex justify-between items-center border-b border-cyber-cardBorder pb-3">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-sliders text-cyber-accent text-lg"></i>
+          <h3 class="text-base font-bold font-orbitron">คู่มือใช้งานข้ามหน้าต่าง & สตรีมเสียงเข้าเกม / Discord</h3>
+        </div>
+        <button id="closeGuideBtn" class="text-gray-400 hover:text-white text-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- GUIDE TABS NAVIGATION -->
+      <div class="flex border-b border-cyber-cardBorder gap-2 text-xs flex-wrap">
+        <button id="tabGamepadTrickBtn" class="px-4 py-2 font-bold border-b-2 border-cyber-accent text-cyber-accent">⚡ 1. เล่นซาวด์ตอนย่อจอ (Gamepad)</button>
+        <button id="tabAudioRouteBtn" class="px-4 py-2 font-bold border-b-2 border-transparent text-gray-400 hover:text-white">2. ส่งเสียงเข้า Mic (VB-Cable)</button>
+        <button id="tabGlobalHotkeyBtn" class="px-4 py-2 font-bold border-b-2 border-transparent text-gray-400 hover:text-white">3. สคริปต์ AHK (กรณีไม่มีจอย)</button>
+      </div>
+
+      <!-- TAB 1 CONTENT: GAMEPAD BACKGROUND TRICK -->
+      <div id="tabGamepadTrickContent" class="space-y-3 overflow-y-auto pr-2 text-xs text-gray-300 leading-relaxed">
+        <div class="bg-cyber-dark p-3.5 rounded-xl border border-cyber-accent/30 space-y-2">
+          <div class="font-bold text-cyber-green text-sm flex items-center gap-2">
+            <i class="fa-solid fa-gamepad text-base"></i>
+            <span>วิธีเล่นซาวด์เอฟเฟกต์ขณะเล่นเกม / ย่อเบราว์เซอร์ลง Taskbar ด้วย Gamepad:</span>
+          </div>
+          <p>บราวเซอร์ตระกูล Chromium (Chrome, Edge, Brave, Opera) มีฟีเจอร์มาตรฐาน <strong>Gamepad API</strong> ซึ่งยอมให้อ่านสัญญาณจอยเกมขณะเบราว์เซอร์อยู่ Background ได้โดยไม่มีข้อจำกัดด้านความปลอดภัยเหมือน Keyboard!</p>
+          <ol class="list-decimal list-inside space-y-2 pl-2 text-gray-300">
+            <li>เสียบจอยสติ๊ก / จอยเกม (<strong class="text-white">Xbox, PlayStation DualSense/DualShock, Joy-Con</strong> หรือจอย USB ทั่วไป) เข้ากับคอมพิวเตอร์</li>
+            <li>กดปุ่มใดก็ได้บนจอย 1 ครั้ง จะมีไฟสถานะสีเขียวขึ้นว่า <span class="bg-cyber-card border border-cyber-green text-cyber-green px-2 py-0.5 rounded font-mono">🎮 Gamepad Connected</span> ที่มุมขวาบน</li>
+            <li>กดปุ่มเปลี่ยน Hotkey บน Soundpad แล้วกดปุ่มจอยที่ต้องการ เช่น <strong class="text-white">Gamepad_Btn_0 (ปุ่ม A/Cross)</strong> หรือ <strong class="text-white">Gamepad_Btn_4 (ปุ่ม LB/L1)</strong></li>
+            <li>เมื่อตั้งค่าเสร็จ ย่อเว็บบราวเซอร์ลง Taskbar แล้วสลับไปเล่นเกม Fullscreen ได้เลย เมื่อกดปุ่มจอย ซาวด์เอฟเฟกต์จะดังทันที!</li>
+          </ol>
+        </div>
+      </div>
+
+      <!-- TAB 2 CONTENT: AUDIO ROUTING GUIDE -->
+      <div id="tabAudioRouteContent" class="space-y-3 overflow-y-auto pr-2 text-xs text-gray-300 leading-relaxed hidden">
+        <div class="bg-cyber-dark p-3.5 rounded-xl border border-cyber-cardBorder space-y-2">
+          <div class="font-bold text-cyber-accent text-sm flex items-center gap-2">
+            <i class="fa-solid fa-microphone-lines"></i>
+            <span>วิธีทำให้คนในเกม / Discord ได้ยินเสียง Soundpad จากเว็บ:</span>
+          </div>
+          <p>เนื่องจาก Soundpad เว็บเล่นเสียงออกมาทางลำโพงของคุณโดยตรง หากต้องการให้เสียงเปิดใส่ไมค์เพื่อส่งเข้าเกม ให้ทำตามขั้นตอนดังนี้:</p>
+          <ol class="list-decimal list-inside space-y-1.5 pl-2 text-gray-300">
+            <li>ดาวน์โหลดโปรแกรมฟรี <strong class="text-white">VB-Audio Virtual Cable (VB-Cable)</strong></li>
+            <li>ตั้งค่าใน Windows Sound Settings: ให้ Soundpad เว็บนี้ส่ง Output ไปยัง <span class="bg-cyber-card px-1.5 py-0.5 rounded text-cyber-accent">CABLE Input (VB-Audio Virtual Cable)</span></li>
+            <li>ใช้วิธี <strong class="text-white">Listen to this device</strong> หรือใช้โปรแกรมผสมเสียง เช่น <strong class="text-white">VoiceMeeter Banana / OBS Audio Mixer</strong> เพื่อรวมเสียง Mic จริงของคุณ เข้ากับ Virtual Cable ก่อนส่งเข้าเกมหรือ Discord</li>
+          </ol>
+        </div>
+      </div>
+
+      <!-- TAB 3 CONTENT: GLOBAL HOTKEY SCRIPT CODES -->
+      <div id="tabGlobalHotkeyContent" class="space-y-3 overflow-y-auto pr-2 text-xs text-gray-300 leading-relaxed hidden">
+        <div class="bg-cyber-dark p-3 rounded-xl border border-cyber-cardBorder space-y-2">
+          <div class="font-bold text-cyber-yellow flex items-center gap-2">
+            <i class="fa-solid fa-code"></i>
+            <span>ทางเลือก: ใช้สคริปต์ AutoHotkey ส่งสัญญาณคีย์บอร์ด</span>
+          </div>
+          <p>หากไม่มี Gamepad สามารถใช้สคริปต์ AutoHotkey เพื่อส่งสัญญาณ Keyboard กดปุ่ม Numpad มาที่เว็บ Chrome/Edge ได้แม้ย่อหน้าต่าง:</p>
+
+          <div class="mt-3">
+            <div class="flex justify-between items-center bg-gray-900 px-3 py-1.5 rounded-t-lg border-x border-t border-cyber-cardBorder">
+              <span class="font-bold text-cyber-yellow font-mono text-[11px]">AutoHotkey (AHK v2 Script)</span>
+              <button onclick="copyCode('ahkCode')" class="text-[10px] bg-cyber-card hover:bg-cyber-accent hover:text-cyber-dark text-gray-300 px-2 py-0.5 rounded transition-all">
+                <i class="fa-solid fa-copy mr-1"></i>ก๊อปปี้โค้ด
+              </button>
+            </div>
+            <pre id="ahkCode" class="bg-black/90 p-3 rounded-b-lg font-mono text-[11px] text-green-400 overflow-x-auto border border-cyber-cardBorder">
+; AutoHotkey v2 Script - Forward Global Hotkeys to Web Soundpad
+Numpad1::ControlSend("{Numpad1}",, "ahk_exe chrome.exe")
+Numpad2::ControlSend("{Numpad2}",, "ahk_exe chrome.exe")
+Numpad3::ControlSend("{Numpad3}",, "ahk_exe chrome.exe")
+</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="max-w-7xl mx-auto w-full mt-6 text-center text-[11px] text-cyber-muted border-t border-cyber-cardBorder/50 pt-4 flex flex-col sm:flex-row justify-between items-center gap-2">
+    <div>Soundpad Pro &copy; Polyphonic Web Engine + Gamepad API Active</div>
+    <div class="flex items-center gap-3">
+      <span class="text-cyber-green"><i class="fa-solid fa-gamepad mr-1"></i> Web Gamepad API</span>
+      <span class="text-cyber-accent"><i class="fa-solid fa-bolt mr-1"></i> Zero Latency</span>
+    </div>
+  </footer>
+
+  <script>
+    /* ==========================================================================
+       GLOBAL APP STATE & AUDIO ENGINE INITIALIZATION
+       ========================================================================== */
+    const DB_NAME = 'SoundpadProDB';
+    const DB_VERSION = 1;
+    let db = null;
+
+    let soundpadItems = []; // Sound item definitions
+    let audioBuffers = {}; // Decoded Web Audio API AudioBuffers
+    let activeBufferSources = {}; // Active playing Node instances for Polyphony/Monophony
+    let audioCtx = null; // Master AudioContext
+
+    let playbackMode = 'polyphonic'; // 'polyphonic' or 'monophonic'
+    let activeTrimmerId = null;
+    let activeKeybindId = null;
+    let trimmerPreviewSource = null;
+
+    // GAMEPAD CONTROLLER ENGINE STATE
+    let connectedGamepads = {};
+    let prevGamepadButtonsState = {}; // Store previous button frames for debouncing
+    let gamepadPollingInterval = null;
+
+    // DOM Elements
+    const audioFileInput = document.getElementById('audioFileInput');
+    const audioFileInputEmpty = document.getElementById('audioFileInputEmpty');
+    const soundpadGrid = document.getElementById('soundpadGrid');
+    const emptyState = document.getElementById('emptyState');
+    const stopAllBtn = document.getElementById('stopAllBtn');
+    const modePolyBtn = document.getElementById('modePolyBtn');
+    const modeMonoBtn = document.getElementById('modeMonoBtn');
+    
+    // Gamepad Indicator DOM
+    const gamepadStatusBadge = document.getElementById('gamepadStatusBadge');
+    const gamepadStatusDot = document.getElementById('gamepadStatusDot');
+    const gamepadStatusIcon = document.getElementById('gamepadStatusIcon');
+    const gamepadStatusText = document.getElementById('gamepadStatusText');
+
+    // Modals & Trimmer DOM
+    const trimmerModal = document.getElementById('trimmerModal');
+    const trimmerModalContent = document.getElementById('trimmerModalContent');
+    const closeTrimmerBtn = document.getElementById('closeTrimmerBtn');
+    const cancelTrimBtn = document.getElementById('cancelTrimBtn');
+    const saveTrimBtn = document.getElementById('saveTrimBtn');
+    const previewTrimBtn = document.getElementById('previewTrimBtn');
+    const startRange = document.getElementById('startRange');
+    const endRange = document.getElementById('endRange');
+    const fadeInInput = document.getElementById('fadeInInput');
+    const fadeOutInput = document.getElementById('fadeOutInput');
+    const volumeBoostCheckbox = document.getElementById('volumeBoostCheckbox');
+    const startTimeLabel = document.getElementById('startTimeLabel');
+    const endTimeLabel = document.getElementById('endTimeLabel');
+    const trimmerFileName = document.getElementById('trimmerFileName');
+    const trimmerDuration = document.getElementById('trimmerDuration');
+    const waveformCanvas = document.getElementById('waveformCanvas');
+    const trimOverlayLeft = document.getElementById('trimOverlayLeft');
+    const trimOverlayRight = document.getElementById('trimOverlayRight');
+
+    // Keybind DOM
+    const keybindModal = document.getElementById('keybindModal');
+    const keybindListeningText = document.getElementById('keybindListeningText');
+    const cancelKeybindBtn = document.getElementById('cancelKeybindBtn');
+    const removeKeybindBtn = document.getElementById('removeKeybindBtn');
+
+    // Guide Modal DOM
+    const openGuideBtn = document.getElementById('openGuideBtn');
+    const guideModal = document.getElementById('guideModal');
+    const closeGuideBtn = document.getElementById('closeGuideBtn');
+    const tabGamepadTrickBtn = document.getElementById('tabGamepadTrickBtn');
+    const tabAudioRouteBtn = document.getElementById('tabAudioRouteBtn');
+    const tabGlobalHotkeyBtn = document.getElementById('tabGlobalHotkeyBtn');
+    const tabGamepadTrickContent = document.getElementById('tabGamepadTrickContent');
+    const tabAudioRouteContent = document.getElementById('tabAudioRouteContent');
+    const tabGlobalHotkeyContent = document.getElementById('tabGlobalHotkeyContent');
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      initAudioContext();
+      await initIndexedDB();
+      await loadPadsFromDB();
+      setupEventListeners();
+      initGamepadEngine();
+      renderGrid();
+    });
+
+    function initAudioContext() {
+      const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+      audioCtx = new AudioCtxClass();
+    }
+
+    function ensureAudioContextActive() {
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    function initIndexedDB() {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+        request.onupgradeneeded = (e) => {
+          db = e.target.result;
+          if (!db.objectStoreNames.contains('sounds')) {
+            db.createObjectStore('sounds', { keyPath: 'id' });
+          }
+        };
+
+        request.onsuccess = (e) => {
+          db = e.target.result;
+          resolve(db);
+        };
+
+        request.onerror = (e) => {
+          console.error('IndexedDB error:', e);
+          reject(e);
+        };
+      });
+    }
+
+    function savePadToDB(padItem) {
+      return new Promise((resolve, reject) => {
+        if (!db) return resolve();
+        const tx = db.transaction('sounds', 'readwrite');
+        const store = tx.objectStore('sounds');
+        store.put(padItem);
+        tx.oncomplete = () => resolve();
+        tx.onerror = (err) => reject(err);
+      });
+    }
+
+    function deletePadFromDB(id) {
+      return new Promise((resolve, reject) => {
+        if (!db) return resolve();
+        const tx = db.transaction('sounds', 'readwrite');
+        const store = tx.objectStore('sounds');
+        store.delete(id);
+        tx.oncomplete = () => resolve();
+        tx.onerror = (err) => reject(err);
+      });
+    }
+
+    async function loadPadsFromDB() {
+      return new Promise((resolve) => {
+        if (!db) return resolve();
+        const tx = db.transaction('sounds', 'readonly');
+        const store = tx.objectStore('sounds');
+        const request = store.getAll();
+
+        request.onsuccess = async () => {
+          soundpadItems = request.result || [];
+          
+          for (const item of soundpadItems) {
+            if (item.arrayBuffer) {
+              try {
+                const bufferCopy = item.arrayBuffer.slice(0);
+                audioBuffers[item.id] = await audioCtx.decodeAudioData(bufferCopy);
+              } catch (err) {
+                console.error(`Failed to decode audio for ${item.name}`, err);
+              }
+            }
+          }
+          resolve();
+        };
+      });
+    }
+
+    function initGamepadEngine() {
+      window.addEventListener("gamepadconnected", (e) => {
+        console.log("Gamepad connected:", e.gamepad);
+        connectedGamepads[e.gamepad.index] = e.gamepad;
+        updateGamepadUIStatus();
+      });
+
+      window.addEventListener("gamepaddisconnected", (e) => {
+        console.log("Gamepad disconnected:", e.gamepad);
+        delete connectedGamepads[e.gamepad.index];
+        delete prevGamepadButtonsState[e.gamepad.index];
+        updateGamepadUIStatus();
+      });
+
+      // Continuous Polling Loop using setInterval to ensure background operation even when requestAnimationFrame throttles
+      if (!gamepadPollingInterval) {
+        gamepadPollingInterval = setInterval(pollGamepadState, 16); // ~60fps poll rate
+      }
+    }
+
+    function updateGamepadUIStatus() {
+      const pads = Object.values(connectedGamepads);
+      if (pads.length > 0) {
+        const activeGamepad = pads[0];
+        let name = activeGamepad.id;
+        if (name.length > 18) name = name.substring(0, 18) + '...';
+
+        gamepadStatusDot.className = "w-2.5 h-2.5 rounded-full bg-cyber-green animate-ping";
+        gamepadStatusIcon.className = "fa-solid fa-gamepad text-cyber-green text-glow-green";
+        gamepadStatusText.innerText = name;
+        gamepadStatusText.className = "font-bold text-cyber-green font-orbitron text-[11px]";
+        gamepadStatusBadge.className = "bg-cyber-dark px-3 py-1.5 rounded-xl border border-cyber-green/50 flex items-center gap-2 text-xs transition-all glow-green";
+      } else {
+        gamepadStatusDot.className = "w-2.5 h-2.5 rounded-full bg-gray-500";
+        gamepadStatusIcon.className = "fa-solid fa-gamepad text-gray-400";
+        gamepadStatusText.innerText = "No Gamepad";
+        gamepadStatusText.className = "font-bold text-gray-400 font-orbitron";
+        gamepadStatusBadge.className = "bg-cyber-dark px-3 py-1.5 rounded-xl border border-cyber-cardBorder flex items-center gap-2 text-xs transition-all";
+      }
+    }
+
+    function pollGamepadState() {
+      // Standard navigator.getGamepads() refresh
+      const rawPads = navigator.getGamepads ? navigator.getGamepads() : (navigator.webkitGetGamepads ? navigator.webkitGetGamepads() : []);
+      if (!rawPads) return;
+
+      for (let i = 0; i < rawPads.length; i++) {
+        const gp = rawPads[i];
+        if (!gp) continue;
+
+        // Keep connected list refreshed
+        connectedGamepads[gp.index] = gp;
+
+        if (!prevGamepadButtonsState[gp.index]) {
+          prevGamepadButtonsState[gp.index] = [];
+        }
+
+        const prevButtons = prevGamepadButtonsState[gp.index];
+
+        for (let b = 0; b < gp.buttons.length; b++) {
+          const isPressed = gp.buttons[b].pressed;
+          const wasPressed = prevButtons[b] || false;
+
+          // Detect Initial Press Event (Rising Edge Trigger)
+          if (isPressed && !wasPressed) {
+            const gamepadButtonCode = `Gamepad_Btn_${b}`;
+            handleGamepadButtonPress(gamepadButtonCode);
+          }
+
+          prevButtons[b] = isPressed;
+        }
+      }
+
+      updateGamepadUIStatus();
+    }
+
+    function handleGamepadButtonPress(buttonCode) {
+      // 1. If Keybind Modal is open, bind the button
+      if (activeKeybindId) {
+        const item = soundpadItems.find(s => s.id === activeKeybindId);
+        if (item) {
+          item.keybind = buttonCode;
+          savePadToDB(item);
+          renderGrid();
+        }
+        closeKeybindModal();
+        return;
+      }
+
+      // 2. Otherwise trigger sound effect mapped to this button
+      const targetPad = soundpadItems.find(s => s.keybind === buttonCode);
+      if (targetPad) {
+        playPadSound(targetPad.id);
+      }
+    }
+
+    function setupEventListeners() {
+      audioFileInput.addEventListener('change', handleFilesSelect);
+      audioFileInputEmpty.addEventListener('change', handleFilesSelect);
+
+      stopAllBtn.addEventListener('click', stopAllSounds);
+
+      // Playback Mode Switches
+      modePolyBtn.addEventListener('click', () => setPlaybackMode('polyphonic'));
+      modeMonoBtn.addEventListener('click', () => setPlaybackMode('monophonic'));
+
+      // Trimmer Controls
+      closeTrimmerBtn.addEventListener('click', closeTrimmer);
+      cancelTrimBtn.addEventListener('click', closeTrimmer);
+      saveTrimBtn.addEventListener('click', saveTrimSettings);
+      previewTrimBtn.addEventListener('click', previewTrimmedAudio);
+
+      startRange.addEventListener('input', updateTrimmerUI);
+      endRange.addEventListener('input', updateTrimmerUI);
+
+      // Keybind Controls
+      cancelKeybindBtn.addEventListener('click', closeKeybindModal);
+      removeKeybindBtn.addEventListener('click', removeKeybind);
+
+      // Guide Modal Navigation
+      openGuideBtn.addEventListener('click', () => guideModal.classList.remove('opacity-0', 'pointer-events-none'));
+      closeGuideBtn.addEventListener('click', () => guideModal.classList.add('opacity-0', 'pointer-events-none'));
+
+      tabGamepadTrickBtn.addEventListener('click', () => {
+        tabGamepadTrickBtn.className = 'px-4 py-2 font-bold border-b-2 border-cyber-accent text-cyber-accent';
+        tabAudioRouteBtn.className = 'px-4 py-2 font-bold border-b-2 border-transparent text-gray-400 hover:text-white';
+        tabGlobalHotkeyBtn.className = 'px-4 py-2 font-bold border-b-2 border-transparent text-gray-400 hover:text-white';
+        tabGamepadTrickContent.classList.remove('hidden');
+        tabAudioRouteContent.classList.add('hidden');
+        tabGlobalHotkeyContent.classList.add('hidden');
+      });
+
+      tabAudioRouteBtn.addEventListener('click', () => {
+        tabAudioRouteBtn.className = 'px-4 py-2 font-bold border-b-2 border-cyber-accent text-cyber-accent';
+        tabGamepadTrickBtn.className = 'px-4 py-2 font-bold border-b-2 border-transparent text-gray-400 hover:text-white';
+        tabGlobalHotkeyBtn.className = 'px-4 py-2 font-bold border-b-2 border-transparent text-gray-400 hover:text-white';
+        tabAudioRouteContent.classList.remove('hidden');
+        tabGamepadTrickContent.classList.add('hidden');
+        tabGlobalHotkeyContent.classList.add('hidden');
+      });
+
+      tabGlobalHotkeyBtn.addEventListener('click', () => {
+        tabGlobalHotkeyBtn.className = 'px-4 py-2 font-bold border-b-2 border-cyber-accent text-cyber-accent';
+        tabGamepadTrickBtn.className = 'px-4 py-2 font-bold border-b-2 border-transparent text-gray-400 hover:text-white';
+        tabAudioRouteBtn.className = 'px-4 py-2 font-bold border-b-2 border-transparent text-gray-400 hover:text-white';
+        tabGlobalHotkeyContent.classList.remove('hidden');
+        tabGamepadTrickContent.classList.add('hidden');
+        tabAudioRouteContent.classList.add('hidden');
+      });
+
+      // Global Keydown Listener for Keyboard
+      window.addEventListener('keydown', handleGlobalKeyDown);
+    }
+
+    function setPlaybackMode(mode) {
+      playbackMode = mode;
+      if (mode === 'polyphonic') {
+        modePolyBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-bold font-orbitron transition-all bg-cyber-accent text-cyber-dark shadow-md';
+        modeMonoBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-bold font-orbitron text-gray-400 hover:text-white transition-all';
+      } else {
+        modeMonoBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-bold font-orbitron transition-all bg-cyber-pink text-white shadow-md';
+        modePolyBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-bold font-orbitron text-gray-400 hover:text-white transition-all';
+      }
+    }
+
+    async function handleFilesSelect(e) {
+      ensureAudioContextActive();
+      const files = Array.from(e.target.files);
+      if (!files.length) return;
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const arrayBuffer = await file.arrayBuffer();
+        
+        try {
+          const decodedBuffer = await audioCtx.decodeAudioData(arrayBuffer.slice(0));
+          const defaultKey = (soundpadItems.length < 9) ? `Numpad${soundpadItems.length + 1}` : null;
+
+          const newItem = {
+            id: 'pad_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+            name: file.name.replace(/\.[^/.]+$/, ""),
+            arrayBuffer: arrayBuffer,
+            duration: decodedBuffer.duration,
+            startTime: 0,
+            endTime: decodedBuffer.duration,
+            volume: 0.8,
+            fadeIn: 0,
+            fadeOut: 0,
+            volumeBoost: false,
+            isLoop: false,
+            keybind: defaultKey
+          };
+
+          audioBuffers[newItem.id] = decodedBuffer;
+          soundpadItems.push(newItem);
+          await savePadToDB(newItem);
+        } catch (err) {
+          console.error('Audio decoding error:', err);
+        }
+      }
+
+      e.target.value = '';
+      renderGrid();
+    }
+
+    function playPadSound(id) {
+      ensureAudioContextActive();
+      const item = soundpadItems.find(s => s.id === id);
+      const buffer = audioBuffers[id];
+
+      if (!item || !buffer) return;
+
+      if (playbackMode === 'monophonic') {
+        stopPadSound(id);
+      }
+
+      const source = audioCtx.createBufferSource();
+      source.buffer = buffer;
+
+      const gainNode = audioCtx.createGain();
+      let effectiveVolume = item.volume * (item.volumeBoost ? 2.0 : 1.0);
+      
+      const now = audioCtx.currentTime;
+      const durationToPlay = item.endTime - item.startTime;
+
+      if (item.fadeIn > 0) {
+        gainNode.gain.setValueAtTime(0, now);
+        gainNode.gain.linearRampToValueAtTime(effectiveVolume, now + item.fadeIn);
+      } else {
+        gainNode.gain.setValueAtTime(effectiveVolume, now);
+      }
+
+      if (item.fadeOut > 0) {
+        const fadeOutStartTime = now + durationToPlay - item.fadeOut;
+        if (fadeOutStartTime > now) {
+          gainNode.gain.setValueAtTime(effectiveVolume, fadeOutStartTime);
+          gainNode.gain.linearRampToValueAtTime(0, now + durationToPlay);
+        }
+      }
+
+      source.loop = item.isLoop;
+      if (item.isLoop) {
+        source.loopStart = item.startTime;
+        source.loopEnd = item.endTime;
+      }
+
+      source.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+
+      if (!activeBufferSources[id]) {
+        activeBufferSources[id] = [];
+      }
+      activeBufferSources[id].push({ source, gainNode });
+
+      source.start(now, item.startTime, item.isLoop ? undefined : durationToPlay);
+
+      triggerPadVisualFlash(id);
+
+      source.onended = () => {
+        if (activeBufferSources[id]) {
+          activeBufferSources[id] = activeBufferSources[id].filter(item => item.source !== source);
+        }
+      };
+    }
+
+    function stopPadSound(id) {
+      if (activeBufferSources[id]) {
+        activeBufferSources[id].forEach(({ source }) => {
+          try { source.stop(); } catch (e) {}
+        });
+        activeBufferSources[id] = [];
+      }
+    }
+
+    function stopAllSounds() {
+      Object.keys(activeBufferSources).forEach(id => {
+        stopPadSound(id);
+      });
+    }
+
+    function triggerPadVisualFlash(id) {
+      const card = document.getElementById(`card-${id}`);
+      if (card) {
+        card.classList.remove('pad-active-flash');
+        void card.offsetWidth;
+        card.classList.add('pad-active-flash');
+      }
+    }
+
+    function renderGrid() {
+      if (soundpadItems.length === 0) {
+        emptyState.classList.remove('hidden');
+        soundpadGrid.classList.add('hidden');
+        return;
+      }
+
+      emptyState.classList.add('hidden');
+      soundpadGrid.classList.remove('hidden');
+      soundpadGrid.innerHTML = '';
+
+      soundpadItems.forEach((item) => {
+        const pad = document.createElement('div');
+        pad.id = `card-${item.id}`;
+        pad.className = `bg-cyber-card border border-cyber-cardBorder hover:border-cyber-accent/50 rounded-2xl p-4 flex flex-col justify-between gap-3 transition-all duration-150 relative group`;
+
+        const keyDisplay = item.keybind ? formatKeyName(item.keybind) : 'NO KEY';
+        const isGamepad = item.keybind && item.keybind.startsWith('Gamepad_Btn_');
+
+        pad.innerHTML = `
+          <!-- TOP ROW: HOTKEY BADGE & TOOLBAR -->
+          <div class="flex items-center justify-between">
+            <button onclick="openKeybindModal('${item.id}')" 
+                    class="bg-cyber-dark hover:bg-cyber-accent/20 border ${isGamepad ? 'border-cyber-green text-cyber-green' : 'border-cyber-accent/40 text-cyber-accent'} font-orbitron font-bold text-[10px] px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5"
+                    title="คลิกเพื่อเปลี่ยนปุ่ม Hotkey (Keyboard / Gamepad)">
+              <i class="fa-solid ${isGamepad ? 'fa-gamepad text-cyber-green' : 'fa-keyboard'} text-[10px]"></i>
+              <span>${keyDisplay}</span>
+            </button>
+
+            <div class="flex items-center gap-1">
+              <button onclick="toggleLoop('${item.id}')" 
+                      class="w-7 h-7 rounded-lg flex items-center justify-center text-xs transition-all ${item.isLoop ? 'bg-cyber-accent text-cyber-dark font-bold' : 'text-gray-500 hover:text-gray-300 bg-cyber-dark'}"
+                      title="เล่นซ้ำ (Loop)">
+                <i class="fa-solid fa-repeat"></i>
+              </button>
+              <button onclick="openTrimmerModal('${item.id}')" 
+                      class="w-7 h-7 rounded-lg text-gray-400 hover:text-cyber-accent bg-cyber-dark flex items-center justify-center text-xs transition-all"
+                      title="ตัดต่อ & ปรับแต่งเสียง">
+                <i class="fa-solid fa-scissors"></i>
+              </button>
+              <button onclick="deletePad('${item.id}')" 
+                      class="w-7 h-7 rounded-lg text-gray-500 hover:text-cyber-pink bg-cyber-dark flex items-center justify-center text-xs transition-all opacity-60 group-hover:opacity-100"
+                      title="ลบเสียงนี้">
+                <i class="fa-solid fa-trash-can"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- MIDDLE: AUDIO NAME & PLAYBACK TRIGGER -->
+          <div class="my-1 cursor-pointer" onclick="playPadSound('${item.id}')">
+            <h3 class="text-xs font-bold text-white truncate group-hover:text-cyber-accent transition-colors mb-1" title="${item.name}">
+              ${item.name}
+            </h3>
+            <div class="flex justify-between items-center text-[10px] text-cyber-muted font-mono">
+              <span>${formatTime(item.startTime)} - ${formatTime(item.endTime)}</span>
+              <span class="${item.volumeBoost ? 'text-cyber-yellow font-bold' : ''}">${item.volumeBoost ? 'BOOST' : formatTime(item.endTime - item.startTime)}</span>
+            </div>
+          </div>
+
+          <!-- RAPID PLAY TRIGGER BUTTON -->
+          <button onclick="playPadSound('${item.id}')" 
+                  class="w-full py-2.5 rounded-xl font-bold font-orbitron text-xs tracking-wider uppercase transition-all duration-150 flex items-center justify-center gap-2 bg-cyber-dark hover:bg-cyber-accent text-gray-200 hover:text-cyber-dark border border-cyber-cardBorder hover:border-cyber-accent active:scale-95 shadow-md">
+            <i class="fa-solid fa-bolt text-cyber-accent group-hover:text-cyber-dark"></i>
+            <span>PLAY</span>
+          </button>
+
+          <!-- BOTTOM: VOLUME SLIDER -->
+          <div class="flex items-center gap-2 pt-1">
+            <i class="fa-solid fa-volume-low text-[10px] text-gray-500"></i>
+            <input type="range" min="0" max="1" step="0.02" value="${item.volume}" 
+                   oninput="adjustVolume('${item.id}', this.value)" 
+                   class="w-full">
+          </div>
+        `;
+
+        soundpadGrid.appendChild(pad);
+      });
+    }
+
+    async function adjustVolume(id, val) {
+      const item = soundpadItems.find(s => s.id === id);
+      if (item) {
+        item.volume = parseFloat(val);
+        await savePadToDB(item);
+      }
+    }
+
+    async function toggleLoop(id) {
+      const item = soundpadItems.find(s => s.id === id);
+      if (item) {
+        item.isLoop = !item.isLoop;
+        await savePadToDB(item);
+        renderGrid();
+      }
+    }
+
+    async function deletePad(id) {
+      stopPadSound(id);
+      delete audioBuffers[id];
+      soundpadItems = soundpadItems.filter(s => s.id !== id);
+      await deletePadFromDB(id);
+      renderGrid();
+    }
+
+    function openTrimmerModal(id) {
+      activeTrimmerId = id;
+      const item = soundpadItems.find(s => s.id === id);
+      if (!item) return;
+
+      trimmerFileName.innerText = item.name;
+      
+      startRange.max = item.duration;
+      endRange.max = item.duration;
+      
+      startRange.value = item.startTime;
+      endRange.value = item.endTime;
+
+      fadeInInput.value = item.fadeIn || 0;
+      fadeOutInput.value = item.fadeOut || 0;
+      volumeBoostCheckbox.checked = item.volumeBoost || false;
+
+      updateTrimmerUI();
+      drawWaveform(audioBuffers[id]);
+
+      trimmerModal.classList.remove('opacity-0', 'pointer-events-none');
+      trimmerModalContent.classList.remove('scale-95');
+    }
+
+    function closeTrimmer() {
+      if (trimmerPreviewSource) {
+        try { trimmerPreviewSource.stop(); } catch(e){}
+        trimmerPreviewSource = null;
+      }
+      activeTrimmerId = null;
+      trimmerModal.classList.add('opacity-0', 'pointer-events-none');
+      trimmerModalContent.classList.add('scale-95');
+    }
+
+    function updateTrimmerUI() {
+      let start = parseFloat(startRange.value);
+      let end = parseFloat(endRange.value);
+
+      if (start >= end) {
+        start = end - 0.1;
+        startRange.value = start;
+      }
+
+      startTimeLabel.innerText = formatTime(start);
+      endTimeLabel.innerText = formatTime(end);
+
+      const item = soundpadItems.find(s => s.id === activeTrimmerId);
+      const dur = item ? item.duration : 100;
+      trimmerDuration.innerText = `${formatTime(end - start)} / ${formatTime(dur)}`;
+
+      const leftPercent = (start / dur) * 100;
+      const rightPercent = 100 - ((end / dur) * 100);
+
+      trimOverlayLeft.style.width = `${leftPercent}%`;
+      trimOverlayRight.style.width = `${rightPercent}%`;
+    }
+
+    function previewTrimmedAudio() {
+      ensureAudioContextActive();
+      const item = soundpadItems.find(s => s.id === activeTrimmerId);
+      const buffer = audioBuffers[activeTrimmerId];
+      if (!item || !buffer) return;
+
+      if (trimmerPreviewSource) {
+        try { trimmerPreviewSource.stop(); } catch(e){}
+      }
+
+      const start = parseFloat(startRange.value);
+      const end = parseFloat(endRange.value);
+
+      trimmerPreviewSource = audioCtx.createBufferSource();
+      trimmerPreviewSource.buffer = buffer;
+
+      const gainNode = audioCtx.createGain();
+      gainNode.gain.setValueAtTime(item.volume * (volumeBoostCheckbox.checked ? 2.0 : 1.0), audioCtx.currentTime);
+
+      trimmerPreviewSource.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+
+      trimmerPreviewSource.start(audioCtx.currentTime, start, end - start);
+    }
+
+    async function saveTrimSettings() {
+      const item = soundpadItems.find(s => s.id === activeTrimmerId);
+      if (item) {
+        item.startTime = parseFloat(startRange.value);
+        item.endTime = parseFloat(endRange.value);
+        item.fadeIn = parseFloat(fadeInInput.value) || 0;
+        item.fadeOut = parseFloat(fadeOutInput.value) || 0;
+        item.volumeBoost = volumeBoostCheckbox.checked;
+
+        await savePadToDB(item);
+        renderGrid();
+      }
+      closeTrimmer();
+    }
+
+    function openKeybindModal(id) {
+      activeKeybindId = id;
+      const item = soundpadItems.find(s => s.id === id);
+      keybindListeningText.innerText = item && item.keybind ? `ปัจจุบัน: ${formatKeyName(item.keybind)}` : 'กดคีย์บอร์ด หรือปุ่มบนจอย...';
+      keybindModal.classList.remove('opacity-0', 'pointer-events-none');
+    }
+
+    function closeKeybindModal() {
+      activeKeybindId = null;
+      keybindModal.classList.add('opacity-0', 'pointer-events-none');
+    }
+
+    async function removeKeybind() {
+      if (activeKeybindId) {
+        const item = soundpadItems.find(s => s.id === activeKeybindId);
+        if (item) {
+          item.keybind = null;
+          await savePadToDB(item);
+          renderGrid();
+        }
+      }
+      closeKeybindModal();
+    }
+
+    function handleGlobalKeyDown(e) {
+      if (activeKeybindId) {
+        e.preventDefault();
+        const pressedKey = e.code;
+
+        const item = soundpadItems.find(s => s.id === activeKeybindId);
+        if (item) {
+          item.keybind = pressedKey;
+          savePadToDB(item);
+          renderGrid();
+        }
+        closeKeybindModal();
+        return;
+      }
+
+      const pressedCode = e.code;
+      const targetPad = soundpadItems.find(s => s.keybind === pressedCode);
+      if (targetPad) {
+        e.preventDefault();
+        playPadSound(targetPad.id);
+      }
+    }
+
+    function formatKeyName(code) {
+      if (!code) return '';
+
+      // Standard Gamepad Buttons Map (Standard Mapping)
+      if (code.startsWith('Gamepad_Btn_')) {
+        const btnIdx = parseInt(code.replace('Gamepad_Btn_', ''));
+        const gamepadNames = {
+          0: '🎮 Button A (Cross)',
+          1: '🎮 Button B (Circle)',
+          2: '🎮 Button X (Square)',
+          3: '🎮 Button Y (Triangle)',
+          4: '🎮 LB (L1)',
+          5: '🎮 RB (R1)',
+          6: '🎮 LT (L2 Trigger)',
+          7: '🎮 RT (R2 Trigger)',
+          8: '🎮 Select (Back)',
+          9: '🎮 Start (Menu)',
+          10: '🎮 L-Stick Click',
+          11: '🎮 R-Stick Click',
+          12: '🎮 D-Pad Up',
+          13: '🎮 D-Pad Down',
+          14: '🎮 D-Pad Left',
+          15: '🎮 D-Pad Right',
+          16: '🎮 Home/Guide'
+        };
+        return gamepadNames[btnIdx] || `🎮 Gamepad Btn ${btnIdx}`;
+      }
+
+      return code
+        .replace('Key', '')
+        .replace('Digit', '')
+        .replace('Numpad', 'Num ')
+        .replace('Arrow', '');
+    }
+
+    function drawWaveform(buffer) {
+      const canvas = waveformCanvas;
+      const ctx = canvas.getContext('2d');
+      canvas.width = canvas.offsetWidth;
+      canvas.height = canvas.offsetHeight;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (!buffer) return;
+
+      const data = buffer.getChannelData(0);
+      const step = Math.ceil(data.length / canvas.width);
+      const amp = canvas.height / 2;
+
+      ctx.fillStyle = '#00f3ff';
+      for (let i = 0; i < canvas.width; i++) {
+        let min = 1.0;
+        let max = -1.0;
+        for (let j = 0; j < step; j++) {
+          const datum = data[(i * step) + j];
+          if (datum < min) min = datum;
+          if (datum > max) max = datum;
+        }
+        ctx.fillRect(i, (1 + min) * amp, 1, Math.max(1, (max - min) * amp));
+      }
+    }
+
+    function formatTime(seconds) {
+      if (isNaN(seconds)) return '00:00.0';
+      const mins = Math.floor(seconds / 60);
+      const secs = Math.floor(seconds % 60);
+      const ms = Math.floor((seconds % 1) * 10);
+      return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms}`;
+    }
+
+    function copyCode(elementId) {
+      const codeText = document.getElementById(elementId).innerText;
+      navigator.clipboard.writeText(codeText);
+      alert('คัดลอกโค้ดสคริปต์เรียบร้อยแล้ว!');
+    }
+  </script>
+</body>
+</html>
